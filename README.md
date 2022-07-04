@@ -1,4 +1,4 @@
-# FindSpot: A Pintool to quickly find the code corresponding to specific functionality in binaries using DBI
+# FindSpot: A Pintool to locate code for specific functionality in binaries using DBI
 
 
 FindSpot is a Pintool that uses the Intel PIN DBI framework to instrument a binary with the intent to locate
@@ -10,7 +10,7 @@ the binary code functions that correspond to a specific functionality of the bin
 
 ## Concept
 
-<todo>
+>>>TODO
 
 
 https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-dynamic-binary-instrumentation-tool.html
@@ -56,64 +56,65 @@ Currently not supported. Soon!
 ## Simple Example
 
 
-void r1() { std::cout << "wow!"; }
-int main()
-{
-	while(1)
-	{
-        int choice = 0;
-		std::cout << "choose: ";
-		std::cin.clear();
-		std::cin >> choice;
-		std::cin.clear();
-		if(choice == 5)
-			r1();
-	}
-}
+    void r1() { std::cout << "wow!"; }
+    int main()
+    {
+        while(1)
+        {
+            int choice = 0;
+            std::cout << "choose: ";
+            std::cin.clear();
+            std::cin >> choice;
+            std::cin.clear();
+            if(choice == 5)
+                r1();
+        }
+    }
 
 
 Above program loops forever, prompting for a number. If the user enters 5, the function r1() is executed, which does something special!
 Our task: How can we find which function is executed when we enter 5, without looking at the code or disassembly?
 
 
-<todo>
+>>>TODO
+
 
 
 ## Advanced Example
 
 We will now demonstrate a more complex example: Finding the function executed when the "bold" ToolBox button is pressed in Libre Office.
 
+>>>TODO
 
-<todo>
 
 
-# Available Commands
+## Available Commands
 
 Note that all FindSpot commands must be prefixed with "monitor ", as per PIN convention.
 Hence the full command to enter in gdb to start collection mode is "monitor mode collect".
 
-gdb>  monitor help
-help          -- print this help.
-clear         -- clear all collected data.
-show          -- show stats on collected data.
-dump <file>   -- dump current data to file.
-mode collect  -- collect all functions called from now on.
-mode trim     -- remove all functions called from now on.
-mode off      -- dont touch collected data.
-mode          -- show current mode.
-sort chrono   -- sort output in the order the functions were encountered.
-sort hitcount -- sort output by number of times the functions were encountered.
-mod           -- display white/blacklist.
-mod blacklist <mod> -- add module to blacklist.
-mod whitelist <mod> -- add module to whitelist.
-mod blacklist remove <mod> -- remove module from blacklist.
-mod whitelist remove <mod> -- remove module from whitelist.
+    gdb>  monitor help
+    help          -- print this help.
+    clear         -- clear all collected data.
+    show          -- show stats on collected data.
+    dump <file>   -- dump current data to file.
+    mode collect  -- collect all functions called from now on.
+    mode trim     -- remove all functions called from now on.
+    mode off      -- dont touch collected data.
+    mode          -- show current mode.
+    sort chrono   -- sort output in the order the functions were encountered.
+    sort hitcount -- sort output by number of times the functions were encountered.
+    mod           -- display white/blacklist.
+    mod blacklist <mod> -- add module to blacklist.
+    mod whitelist <mod> -- add module to whitelist.
+    mod blacklist remove <mod> -- remove module from blacklist.
+    mod whitelist remove <mod> -- remove module from whitelist.
 
 
 
-### Todo
+## Todo
 
 * fix windows support
 * attach/detach
-* thread whiteliste/blacklist
+* thread whitelist/blacklist
 
