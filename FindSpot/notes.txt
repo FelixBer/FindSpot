@@ -17,3 +17,8 @@
 >:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ gdb --args /usr/lib/libreoffice/program/soffice.bin  --writer
 
 ../../../pin -appdebug -t obj-intel64/FindSpot.so -- /usr/lib/libreoffice/program/soffice.bin --writer
+
+
+windows:
+FindSpot4>..\..\..\pin -t x64\Release\FindSpot.dll -- example-1\x64\Release\example-1.exe
+FindSpot4\findspot-cli>x64\Release\findspot-cli.exe
