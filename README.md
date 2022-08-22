@@ -24,7 +24,7 @@ https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-dynamic-bi
 
 
 1. Download and extract the Intel Pin Framework 3.23: https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-binary-instrumentation-tool-downloads.html
-2. Copy the entire FindSpot folder from this repository into `%PINDIR%/source/tools/`
+2. Copy the entire FindSpot directory from this repository into `%PINDIR%/source/tools/`
 3. On Linux: cd to `%PINDIR%/source/tools/FindSpot` and type 'make'
 4. On Windows: open `%PINDIR%/source/tools/FindSpot.vcxproj` in Visual Studio (tested with VS2019) and hit build
 5. The output is a .so/.dll file located in a sub directory. No further installation is required.
@@ -98,7 +98,7 @@ Our task: How can we find which function is executed when we enter `5`, without 
 8. Any commands issued in gdb to FindSpot have to be prefixed with `monitor`. To see and overview of FindSpot commands, type `monitor help`.
 9. Type `monitor show`:
 
-        gef➤  monitor show
+        gdb>  monitor show
         #            Address       Hits               Module Symbol 
         Total Count: 0
     There is nothing, because no data has been collected yet. Time to change that by switching FindSpot into collection mode with `monitor mode collect`.  
@@ -109,7 +109,7 @@ Our task: How can we find which function is executed when we enter `5`, without 
     Since we are in collection mode, any function executed by the program, including r1(), r2() and any OS-API and C++ runtime, was logged by FindSpot!  
     Verify this by again hitting `ctrl+c` and breaking into gdb.
 
-        gef➤  monitor show
+        gdb>  monitor show
         #        Address   Hits        Module Symbol 
         28   7f030e0e7420     49     libc.so.6 getc 
         5    7f030e400e30     37     libstdc++.so.6 _ZN9__gnu_cxx18st
