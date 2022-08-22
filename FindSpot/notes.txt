@@ -1,0 +1,18 @@
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ ../../../pin -t obj-intel64/proccount.so -- /bin/ls^C
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ make all TARGET=intel64^C
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ ../../../pin -t obj-intel64/inscount1.so -o inscount1.log -- /bin/ls^C
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ ../../../pin -t obj-intel64/itrace.so -- /bin/ls^C
+
+
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ ../../../pin -appdebug -t obj-intel64/stack-debugger-pos.so -- /usr/lib/libreoffice/program/soffice.bin --writer
+
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ make all TARGET=intel64
+
+
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ ../../../pin -t obj-intel64/stack-debugger-pos.so -help -- ls
+
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ gdb /usr/lib/libreoffice/program/soffice.bin 
+
+
+>:~/pin/pin-3.23-98579-gb15ab7903-gcc-linux/source/tools/ManualExamples$ gdb --args /usr/lib/libreoffice/program/soffice.bin  --writer
+
