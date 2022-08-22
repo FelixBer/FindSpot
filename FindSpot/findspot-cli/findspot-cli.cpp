@@ -1,8 +1,8 @@
 #include <iostream>
 #include <string>
 
-#include "socklib.h"
-#include "packetmanager.h"
+#include "../socklib.h"
+#include "../packetmanager.h"
 
 
 void printusage()
