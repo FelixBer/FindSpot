@@ -1,0 +1,8 @@
+obj-intel64
+.vscode
+.vs
+x64
+Release
+*.log
+a.out
+
