@@ -2,27 +2,37 @@
 #include <iostream>
 
 
+#ifdef _WIN32
+	#define WIN_NOINLINE __declspec(noinline)
+	#define LIN_NOINLINE
+#else
+	#define WIN_NOINLINE
+	#define LIN_NOINLINE  __attribute__ ((noinline))
+#endif // _WIN32
+
+
+
 volatile int vx;
 
-void __attribute__ ((noinline)) r0()
+WIN_NOINLINE void LIN_NOINLINE r0()
 {
 	vx = 0;
 	std::cout << "call r0\n";
 }
 
-void __attribute__ ((noinline)) r1()
+WIN_NOINLINE void LIN_NOINLINE r1()
 {
 	vx = 1;
 	std::cout << "call r1\n";
 }
 
-void __attribute__ ((noinline)) r2()
+WIN_NOINLINE void LIN_NOINLINE r2()
 {
 	vx = 2;
 	std::cout << "call r2\n";
 }
 
-void __attribute__ ((noinline)) r3()
+WIN_NOINLINE void LIN_NOINLINE r3()
 {
 	vx = 3;
 }
@@ -54,3 +64,4 @@ int main()
 		r3();
 	}
 }
+
