@@ -34,7 +34,7 @@ public:
     {
         char buf[PACK_LEN+1]{};
 
-        int received = pin_recv(clientfd, (char*)&buf, PACK_LEN);
+        size_t received = pin_recv(clientfd, (char*)&buf, PACK_LEN);
         if(PACK_LEN != received)
         {
             std::cout << "packet len error r = " << received << std::endl;
@@ -60,7 +60,7 @@ public:
     int send_cmd(const std::string& cmd)
     {
         char num[32]{};
-        int tmp = sprintf(num, "%08lX", (unsigned int)cmd.length());
+        int tmp = sprintf(num, "%08X", (unsigned int)cmd.length());
         assertm(tmp == PACK_LEN, "send_cmd error formatting length");
         const std::string packet = num + cmd;
 
@@ -109,6 +109,7 @@ public:
         serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");// INADDR_ANY;
 
         int ret = pin_connect(sockfd, (struct pin_sockaddr*)&serverAddress, sizeof(serverAddress));
+	(void)ret;
         //int err = p_WSAGetLastError();
         return sockfd;
     }
