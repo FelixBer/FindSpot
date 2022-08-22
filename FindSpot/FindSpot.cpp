@@ -1,25 +1,125 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <iomanip>
 #include <string>
 #include <utility>
 #include <map>
 #include <set>
 #include <algorithm>
 
-#include <cctype>
-#include <ctime>
-#include <cassert>
-#define assertm(exp, msg) assert(((void)msg, exp))
+
+
+
 
 #include "pin.H"
+
+
+
+#include "helper.h"
+#include "packetmanager.h"
+
 
 std::ofstream outFile, dbgLog;
 
 // Command line switches for this tool.
-KNOB<std::string> KnobOut(KNOB_MODE_WRITEONCE, "pintool", "o", "", "write output to this file [default findspot.log]");
-KNOB<std::string> KnobDbg(KNOB_MODE_WRITEONCE, "pintool", "d", "", "write detailed debugging log for this tool [default off]");
+KNOB<std::string> KnobOut(KNOB_MODE_WRITEONCE, "pintool", "o", "findspot.log", "write output to this file");
+KNOB<std::string> KnobDbg(KNOB_MODE_WRITEONCE, "pintool", "d", "", "write detailed debugging log to this file [default off]");
+KNOB<int> KnobPort(KNOB_MODE_WRITEONCE, "pintool", "p", to_string(FS_PORT), "port to listen on for controller");
+
+
+
+int port = FS_PORT;
+FindSpotPacketManager manager;
+
+
+
+
+bool execute_string_cmd(const std::string& cmd, std::string* result);
+
+void control_thread(void* arg)
+{
+    //not ideal, since we race the main program start, but good enough for now
+    PIN_StopApplicationThreads(PIN_ThreadId());
+
+    int recv_failures = 0;
+    while(1)
+    {
+        std::string cmd = manager.recv_cmd_block();
+        if(cmd.empty())
+        {
+            if(recv_failures++ < 10)
+                continue;
+            else
+                break;
+        }
+
+        recv_failures = 0;
+
+        //handle some commands without freezing
+        if(cmd == "freeze")
+        {
+            if(PIN_StopApplicationThreads(PIN_ThreadId()))
+                manager.send_cmd("application frozen");
+            else
+                manager.send_cmd("freezing application failed");
+            continue;
+        }
+        else if(cmd == "unfreeze")
+        {
+            PIN_ResumeApplicationThreads(PIN_ThreadId());
+            manager.send_cmd("target resumed");
+            continue;
+        }
+        else if(cmd == "kill")
+        {
+            manager.send_cmd("target killed");
+            break;
+        }
+
+
+        if(!PIN_StopApplicationThreads(PIN_ThreadId()))
+        {
+            auto error = "PIN_StopApplicationThreads() failed, dropping command\n";
+            dbgLog << error;
+            std::cout << error;
+            manager.send_cmd(error);
+            continue;
+        }
+
+        std::string result;
+        bool executed = execute_string_cmd(cmd, &result);
+        if(!executed)
+        {
+            std::cout << "command " << " returned error: " << result << std::endl;
+            dbgLog << "command " << " returned error: " << result << std::endl;
+            result = "unknown command";
+        }
+        dbgLog << "command " << " returned: " << result << std::endl;
+        manager.send_cmd(result);
+
+        PIN_ResumeApplicationThreads(PIN_ThreadId());
+    }
+}
+
+
+int block_until_connect()
+{
+    manager.clientfd = manager.block_accept(port);
+    int sent = manager.send_cmd("hello from findspot 1.0\ntarget frozen, type unfreeze to continue execution");
+
+    PIN_THREAD_UID listener_uid = 0;
+    THREADID thread_id = PIN_SpawnInternalThread(control_thread, NULL, 0, &listener_uid);
+    if ( thread_id == INVALID_THREADID )
+    {
+        dbgLog << "PIN_SpawnInternalThread(listener) failed\n";
+        exit(-1);
+    }
+
+    return sent;
+}
+
+
+
 
 struct RtnInfo
 {
@@ -35,6 +135,8 @@ size_t globalorder = 1;
 
 //sort results chronological (true) or by hitcount (false)
 bool sortbychrono = false;
+
+bool request_detach = false;
 
 //map of all hooked routines
 std::map<ADDRINT, RtnInfo> routines;
@@ -72,148 +174,6 @@ std::string modetostring(mode mm)
     return "???";
 }
 
-/*
-some helper functions
-note: PIN more or less supports c++11
-*/
-
-/*
-//
-// no fold expressions in pin yet...
-//
-
-template<typename S, typename T>
-void print_aligned(S& s, int width, T&& t)
-{
-    s << std::setw(width) << t;
-}
-
-template<typename S, size_t N, typename... Args>
-void print_aligned(S& s, const int (&a)[N], Args&&... args)
-{
-    static_assert(N >= sizeof...(args), "array of widths must match number of parameters");
-    int i = 0;
-    (print_aligned(s, a[i++], std::forward<Args>(args)), ...);
-    s << std::endl;
-}
-
-template<size_t N, typename... Args>
-void print_aligned(const int (&a)[N], Args&&... args)
-{
-    print_aligned(std::cout, a, std::forward<Args>(args)...);
-}
-*/
-
-template <typename S, size_t N, typename T>
-void print_aligned_(S &s, const int (&a)[N], const size_t i, T &&t)
-{
-    assertm(N >= i, "static array out of bound");
-    s << std::setw(a[i]) << t << " ";
-}
-
-template <typename S, size_t N, typename T, typename... Args>
-void print_aligned_(S &s, const int (&a)[N], const size_t i, T &&t, Args &&...args)
-{
-    static_assert(N >= sizeof...(args), "array of widths must match number of parameters");
-    print_aligned_(s, a, i, t);
-    print_aligned_(s, a, i + 1, args...);
-}
-
-template <typename Stream, size_t N, typename... Args>
-void print_aligned(Stream &s, const int (&a)[N], Args &&...args)
-{
-    print_aligned_(s, a, 0, args...);
-    s << std::endl;
-}
-
-template <size_t N, typename... Args>
-void print_aligned(const int (&a)[N], Args &&...args)
-{
-    print_aligned_(std::cout, a, args...);
-    std::cout << std::endl;
-}
-
-template <typename T>
-std::string tohex(T t)
-{
-    // std::format("{:x}", 123);
-    std::stringstream sstream;
-    sstream << std::hex << t;
-    return sstream.str();
-}
-
-const char *StripPath(const char *path)
-{
-    const char *file = strrchr(path, '/');
-    if(file)
-        return file + 1;
-    else
-        return path;
-}
-
-constexpr int NumDigits(int x)
-{  
-    x = abs(x);  
-    return (x < 10 ? 1 :   
-        (x < 100 ? 2 :   
-        (x < 1000 ? 3 :   
-        (x < 10000 ? 4 :   
-        (x < 100000 ? 5 :   
-        (x < 1000000 ? 6 :   
-        (x < 10000000 ? 7 :  
-        (x < 100000000 ? 8 :  
-        (x < 1000000000 ? 9 :  
-        10)))))))));  
-}
-
-std::string datetimestring()
-{
-    std::time_t result = std::time(nullptr);
-    return std::asctime(std::localtime(&result));
-}
-
-/*
- * Trim whitespace from a line of text.  Leading and trailing whitespace is removed.
- * Any internal whitespace is replaced with a single space (' ') character.
- *
- *  inLine[in]  Input text line.
- *
- * Returns: A string with the whitespace trimmed.
- */
-std::string TrimWhitespace(const std::string &inLine)
-{
-    std::string outLine = inLine;
-
-    bool skipNextSpace = true;
-    for(std::string::iterator it = outLine.begin(); it != outLine.end(); ++it)
-    {
-        if(std::isspace(*it))
-        {
-            if(skipNextSpace)
-            {
-                it = outLine.erase(it);
-                if(it == outLine.end())
-                    break;
-            }
-            else
-            {
-                *it = ' ';
-                skipNextSpace = true;
-            }
-        }
-        else
-        {
-            skipNextSpace = false;
-        }
-    }
-    if(!outLine.empty())
-    {
-        std::string::reverse_iterator it = outLine.rbegin();
-        if(std::isspace(*it))
-            outLine.erase(outLine.size() - 1);
-    }
-    return outLine;
-}
 
 /*
 Now some related functions.
@@ -284,17 +244,15 @@ void ImgLoad(IMG img, void *v)
     }
 }
 
-// This function is called before every instruction is executed
-int dbgstatus = 123;
+// This function is called before every hooked routine is executed
 void docount(RtnInfo *rt)
 {
-    int s = PIN_GetDebugStatus();
-    if(dbgstatus != s)
+    if(request_detach)
     {
-        dbgLog << "dbg: " << dbgstatus << " -> " << s << std::endl;
-        dbgstatus = s;
+        request_detach = false;
+        PIN_Detach();
+        return;
     }
-
     if(m == mode::OFF)
     {
         dbgLog << "ignored: " << tohex(rt->address) << " " << rt->image << " " << rt->name << std::endl;
@@ -357,26 +315,14 @@ void Routine(RTN rtn, void *v)
     }
 }
 
-/*
- * This call-back implements the extended debugger commands.
- *
- *  tid[in]         Pin thread ID for debugger's "focus" thread.
- *  ctxt[in,out]    Register state for the debugger's "focus" thread.
- *  cmd[in]         Text of the extended command.
- *  result[out]     Text that the debugger prints when the command finishes.
- *
- * Returns: TRUE if we recognize this extended command.
- */
-bool DebugInterpreter(THREADID tid, CONTEXT *ctxt, const std::string &cmd, std::string *result, void *)
+
+
+bool execute_string_cmd(const std::string& cmd, std::string* result)
 {
-    std::string line = TrimWhitespace(cmd);
-    *result = "";
-
-    dbgLog << "DebugInterpreter: " << line << std::endl;
-
-    if(line == "help")
+    if(cmd == "help")
     {
         result->append("help          -- print this help.\n");
+        result->append("kill          -- kill program (not available with -appdebug).\n");
         result->append("clear         -- clear all collected data.\n");
         result->append("show          -- show stats on collected data.\n");
         result->append("dump <file>   -- dump current data to file.\n");
@@ -391,80 +337,85 @@ bool DebugInterpreter(THREADID tid, CONTEXT *ctxt, const std::string &cmd, std::
         result->append("mod whitelist <mod> -- add module to whitelist.\n");
         result->append("mod blacklist remove <mod> -- remove module from blacklist.\n");
         result->append("mod whitelist remove <mod> -- remove module from whitelist.\n");
-        return TRUE;
+        return true;
     }
-    else if(line == "detach")
+    else if(cmd == "detach")
     {
-        PIN_Detach();
-        return TRUE;
+        //PIN_Detach();
+        request_detach = true;
+        *result = "detach request registered\n";
+        return true;
     }
-    else if(line == "show")
+    else if(cmd == "show")
     {
         *result = PrintData(20);
-        return TRUE;
+        return true;
     }
-    else if(line == "mode")
+    else if(cmd == "mode")
     {
         *result = "current mode: " + modetostring(m) + "\n";
-        return TRUE;
+        return true;
     }
-    else if(line.find("dump") == 0)
+    else if(cmd.find("dump") == 0)
     {
-        std::string path = TrimWhitespace(line.substr(std::strlen("dump")));
+        std::string path = TrimWhitespace(cmd.substr(std::strlen("dump")));
         std::ofstream file;
         file.open(path.c_str());
         if(!file.is_open())
             std::cout << "Could not open file " << path << std::endl;
         else
             write_to_file(file);
-        return TRUE;
+        return true;
     }
-    else if(line == "clear")
+    else if(cmd == "clear")
     {
         ClearData();
         *result = PrintData(20);
-        return TRUE;
+        return true;
     }
-    else if(line == "mode collect")
+    else if(cmd == "mode collect")
     {
         m = mode::COLLECT;
-        return TRUE;
+        *result = "new mode: " + modetostring(m) + "\n";
+        return true;
     }
-    else if(line == "mode trim")
+    else if(cmd == "mode trim")
     {
         m = mode::TRIM;
-        return TRUE;
+        *result = "new mode: " + modetostring(m) + "\n";
+        return true;
     }
-    else if(line == "mode off")
+    else if(cmd == "mode off")
     {
         m = mode::OFF;
-        return TRUE;
+        *result = "new mode: " + modetostring(m) + "\n";
+        return true;
     }
-    else if(line.find("mod blacklist remove") == 0)
+    else if(cmd.find("mod blacklist remove") == 0)
     {
-        std::string mod = TrimWhitespace(line.substr(std::strlen("mod blacklist remove")));
+        std::string mod = TrimWhitespace(cmd.substr(std::strlen("mod blacklist remove")));
         mod_black.erase(mod);
-        return TRUE;
+        return true;
     }
-    else if(line.find("mod whitelist remove") == 0)
+    else if(cmd.find("mod whitelist remove") == 0)
     {
-        std::string mod = TrimWhitespace(line.substr(std::strlen("mod whitelist remove")));
+        std::string mod = TrimWhitespace(cmd.substr(std::strlen("mod whitelist remove")));
         mod_white.erase(mod);
-        return TRUE;
+        return true;
     }
-    else if(line.find("mod blacklist") == 0)
+    else if(cmd.find("mod blacklist") == 0)
     {
-        std::string mod = TrimWhitespace(line.substr(std::strlen("mod blacklist")));
+        std::string mod = TrimWhitespace(cmd.substr(std::strlen("mod blacklist")));
         mod_black.insert(mod);
-        return TRUE;
+        return true;
     }
-    else if(line.find("mod whitelist") == 0)
+    else if(cmd.find("mod whitelist") == 0)
     {
-        std::string mod = TrimWhitespace(line.substr(std::strlen("mod whitelist")));
+        std::string mod = TrimWhitespace(cmd.substr(std::strlen("mod whitelist")));
         mod_white.insert(mod);
-        return TRUE;
+        return true;
     }
-    else if(line.find("mod") == 0)
+    else if(cmd.find("mod") == 0)
     {
         std::stringstream ss;
         ss << "whitelist: ";
@@ -478,24 +429,47 @@ bool DebugInterpreter(THREADID tid, CONTEXT *ctxt, const std::string &cmd, std::
         if(mod_black.empty() && mod_white.empty())
             ss << "All modules are being tracked." << std::endl;
         *result = ss.str();
-        return TRUE;
+        return true;
     }
-    else if(line.find("sort c") == 0)
+    else if(cmd.find("sort c") == 0)
     {
         sortbychrono = true;
-        return TRUE;
+        return true;
     }
-    else if(line.find("sort h") == 0)
+    else if(cmd.find("sort h") == 0)
     {
         sortbychrono = false;
-        return TRUE;
+        return true;
     }
 
-    dbgLog << "Previous command was unknown!" << std::endl;
-    return FALSE; // Unknown command
+    *result = "unknown command";
+    return false;
 }
 
-INT32 Usage()
+/*
+ * This call-back implements the extended debugger commands.
+ *
+ *  tid[in]         Pin thread ID for debugger's "focus" thread.
+ *  ctxt[in,out]    Register state for the debugger's "focus" thread.
+ *  cmd[in]         Text of the extended command.
+ *  result[out]     Text that the debugger prints when the command finishes.
+ *
+ * Returns: true if we recognize this extended command.
+ */
+bool DebugInterpreter(THREADID tid, CONTEXT *ctxt, const std::string &cmd, std::string *result, void *)
+{
+    *result = "";
+    std::string line = TrimWhitespace(cmd);
+
+    dbgLog << "DebugInterpreter: " << line << std::endl;
+
+    bool executed = execute_string_cmd(line, result);
+    if(!executed)
+        dbgLog << "Previous command was unknown!" << std::endl;
+    return executed;
+}
+
+int Usage()
 {
     std::cerr << "This tool helps you find the specific functions executed by some event" << std::endl;
     std::cerr << std::endl << KNOB_BASE::StringKnobSummary() << std::endl;
@@ -509,40 +483,30 @@ int main(int argc, char *argv[])
     if(PIN_Init(argc, argv))
         return Usage();
 
-    if(PIN_GetDebugStatus() == DEBUG_STATUS_DISABLED)
-    {
-        std::cerr << "Application level debugging must be enabled to use this tool.\n";
-        std::cerr << "Start Pin with either -appdebug or -appdebug_enable.\n";
-        std::cerr << std::flush;
-        return 1;
-    }
-
-    if(!KnobOut.Value().empty())
-        outFile.open(KnobOut.Value().c_str());
-    else
-        outFile.open("findspot.log");
+    port = KnobPort.Value();
+    outFile.open(KnobOut.Value().c_str());
 
     if(!KnobDbg.Value().empty())
         dbgLog.open(KnobDbg.Value().c_str());
 
-    LOG("Time: " + datetimestring());
-    outFile << ("Time: " + datetimestring());
-    dbgLog << ("Time: " + datetimestring());
-    LOG("Writing output to " + KnobOut.Value() + "\n");
-
-    dbgLog << "dbg: DEBUG_STATUS_DISABLED = "  << DEBUG_STATUS_DISABLED << std::endl;
-    dbgLog << "dbg: DEBUG_STATUS_UNCONNECTABLE = "  << DEBUG_STATUS_UNCONNECTABLE << std::endl;
-    dbgLog << "dbg: DEBUG_STATUS_UNCONNECTED = "  << DEBUG_STATUS_UNCONNECTED << std::endl;
-    dbgLog << "dbg: DEBUG_STATUS_CONNECTED = "  << DEBUG_STATUS_CONNECTED << std::endl;
+    const std::string timestamp = datetimestring();
+    LOG("time: " + timestamp + "\n");
+    LOG("port: " + to_string(port) + "\n");
+    LOG("writing output to " + KnobOut.Value() + "\n");
+    dbgLog << "time: " << timestamp << std::endl;
+    dbgLog << "port: " << port << std::endl;
+    dbgLog << "" << PIN_Version() << std::endl;
+    dbgLog << "pin: " << PIN_VmFullPath() << std::endl;
+    dbgLog << "tool: " << PIN_ToolFullPath() << std::endl;
+    outFile << "time: " << timestamp << std::endl;
 
     PIN_AddDebugInterpreter(DebugInterpreter, 0);
     RTN_AddInstrumentFunction(Routine, 0);
     PIN_AddFiniFunction(Fini, 0);
     IMG_AddInstrumentFunction(ImgLoad, 0);
 
+    block_until_connect();
+
     PIN_StartProgram();
     return 0;
 }
-
-
-// htb timelapse
