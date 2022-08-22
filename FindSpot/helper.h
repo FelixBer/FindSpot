@@ -111,13 +111,17 @@ const char *StripPath(const char *path)
     const char *file = strrchr(path, '/');
     if(file)
         return file + 1;
-    else
-        return path;
+    file = strrchr(path, '\\');
+    if (file)
+        return file + 1;
+    return path;
 }
 
 constexpr int NumDigits(int x)
 {  
-    x = abs(x);  
+    //x = std::abs(x); 
+    if (x < 0)
+        x *= -1;
     return (x < 10 ? 1 :   
         (x < 100 ? 2 :   
         (x < 1000 ? 3 :   
@@ -181,3 +185,4 @@ std::string TrimWhitespace(const std::string &inLine)
 
 
 #endif
+

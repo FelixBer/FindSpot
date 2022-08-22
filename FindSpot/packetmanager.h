@@ -19,11 +19,14 @@ public:
     PIN_SOCKET clientfd = INVALID_SOCKET;
     bool extended_dbg = false;
 
-    explicit FindSpotPacketManager(PIN_SOCKET sock = INVALID_SOCKET) : clientfd(sock) {}
+    explicit FindSpotPacketManager(PIN_SOCKET sock = INVALID_SOCKET) : clientfd(sock)
+    {
+        init();
+    }
     ~FindSpotPacketManager()
     {
         if(clientfd != INVALID_SOCKET)
-            close(clientfd);
+            pin_closesocket(clientfd);
         clientfd = INVALID_SOCKET;
     }
 
@@ -38,7 +41,7 @@ public:
             return "";
         }
 
-        const int packetlen = fromhex(buf);
+        const size_t packetlen = fromhex(buf);
 
         std::string r;
         r.resize(packetlen);
@@ -56,15 +59,15 @@ public:
 
     int send_cmd(const std::string& cmd)
     {
-        char num[50]{};
-        int tmp = sprintf(num, "%08lX", cmd.length());
+        char num[32]{};
+        int tmp = sprintf(num, "%08lX", (unsigned int)cmd.length());
         assertm(tmp == PACK_LEN, "send_cmd error formatting length");
         const std::string packet = num + cmd;
 
         if(extended_dbg)
             std::cout << "sending packet: " << packet << std::endl;
 
-        int len = packet.length();
+        size_t len = packet.length();
         int sent = 0;
         while(len > 0)
         {
@@ -103,12 +106,14 @@ public:
         struct pin_sockaddr_in serverAddress;
         serverAddress.sin_family = AF_INET;
         serverAddress.sin_port = pin_htons(port);
-        serverAddress.sin_addr.s_addr = INADDR_ANY;
+        serverAddress.sin_addr.s_addr = inet_addr("127.0.0.1");// INADDR_ANY;
 
-        pin_connect(sockfd, (struct pin_sockaddr*)&serverAddress, sizeof(serverAddress));
+        int ret = pin_connect(sockfd, (struct pin_sockaddr*)&serverAddress, sizeof(serverAddress));
+        //int err = p_WSAGetLastError();
         return sockfd;
     }
 };
 
 
 #endif
+

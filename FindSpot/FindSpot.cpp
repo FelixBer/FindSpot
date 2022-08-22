@@ -1,3 +1,8 @@
+
+
+#include "pin.H"
+
+
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -6,12 +11,6 @@
 #include <map>
 #include <set>
 #include <algorithm>
-
-
-
-
-
-#include "pin.H"
 
 
 
@@ -193,7 +192,7 @@ void PrintData(Stream& ss, size_t n = INT32_MAX)
     if(!sortbychrono)
         std::sort(vec.begin(), vec.end(), [](const auto& a, const auto& b) { return a.rtnCount > b.rtnCount; });
 
-    const int ww[]{NumDigits(vec.size()), 18, 10, 20, 0};
+    const int ww[]{NumDigits((int)vec.size()), 18, 10, 20, 0};
     print_aligned(ss, ww, "#", "Address", "Hits", "Module", "Symbol");
 
     size_t lim = 0;
@@ -496,7 +495,7 @@ int main(int argc, char *argv[])
     dbgLog << "time: " << timestamp << std::endl;
     dbgLog << "port: " << port << std::endl;
     dbgLog << "" << PIN_Version() << std::endl;
-    dbgLog << "pin: " << PIN_VmFullPath() << std::endl;
+   // dbgLog << "pin: " << PIN_VmFullPath() << std::endl;
     dbgLog << "tool: " << PIN_ToolFullPath() << std::endl;
     outFile << "time: " << timestamp << std::endl;
 
