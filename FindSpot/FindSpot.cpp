@@ -1,7 +1,4 @@
-
-
 #include "pin.H"
-
 
 #include <iostream>
 #include <sstream>
@@ -12,29 +9,37 @@
 #include <set>
 #include <algorithm>
 
-
-
 #include "helper.h"
 #include "packetmanager.h"
 
 
-std::ofstream outFile, dbgLog;
+//connection and logging data
 
-// Command line switches for this tool.
+//final dump of results
+std::ofstream outFile;
+
+//detailed debug log (performance hit), only if given by -d Knob
+std::ofstream dbgLog;
+
+//Command line switches for this tool.
 KNOB<std::string> KnobOut(KNOB_MODE_WRITEONCE, "pintool", "o", "findspot.log", "write output to this file");
 KNOB<std::string> KnobDbg(KNOB_MODE_WRITEONCE, "pintool", "d", "", "write detailed debugging log to this file [default off]");
 KNOB<int> KnobPort(KNOB_MODE_WRITEONCE, "pintool", "p", to_string(FS_PORT), "port to listen on for controller");
 
-
-
+//port to listen on for controller connection
 int port = FS_PORT;
-FindSpotPacketManager manager;
 
+//communication with controller
+FindSpotPacketManager manager;
 
 
 
 bool execute_string_cmd(const std::string& cmd, std::string* result);
 
+/*
+* Thread the continously listens for commands from controller.
+* This is a "internal" PIN thread spawned by PIN_SpawnInternalThread() upon controller connection.
+*/
 void control_thread(void* arg)
 {
     //not ideal, since we race the main program start, but good enough for now
@@ -71,7 +76,7 @@ void control_thread(void* arg)
         }
         else if(cmd == "kill")
         {
-            manager.send_cmd("target killed");
+            manager.send_cmd("not implemented");
             break;
         }
 
@@ -118,7 +123,7 @@ int block_until_connect()
 }
 
 
-
+//core functionality data
 
 struct RtnInfo
 {
@@ -135,6 +140,7 @@ size_t globalorder = 1;
 //sort results chronological (true) or by hitcount (false)
 bool sortbychrono = false;
 
+//detach from the target as soon as possible
 bool request_detach = false;
 
 //map of all hooked routines
@@ -145,7 +151,7 @@ std::set<std::string> mod_white;
 std::set<std::string> mod_black;
 
 //returns false if the module should be ignored due to blacklist/whitelist
-bool dologmodule(const std::string &str)
+bool should_consider_module(const std::string &str)
 {
     if(mod_white.size())
         return mod_white.count(str);
@@ -259,7 +265,7 @@ void docount(RtnInfo *rt)
     }
     if(m == mode::TRIM)
     {
-        if(dologmodule(rt->image))
+        if(should_consider_module(rt->image))
         {
             rt->rtnCount = 0;
             dbgLog << "trimmed: " << tohex(rt->address) << " " << rt->image << " " << rt->name << std::endl;
@@ -268,7 +274,7 @@ void docount(RtnInfo *rt)
     }
     if(m == mode::COLLECT)
     {
-        if(dologmodule(rt->image))
+        if(should_consider_module(rt->image))
         {
             rt->rtnCount++;
             dbgLog << "collect: " << tohex(rt->address) << " " << rt->image << " " << rt->name << std::endl;
@@ -283,7 +289,7 @@ void Routine(RTN rtn, void *v)
     std::string filename = StripPath(IMG_Name(SEC_Img(RTN_Sec(rtn))).c_str());
     ADDRINT adr = RTN_Address(rtn);
 
-    if(dologmodule(filename))
+    if(should_consider_module(filename)) //todo: this means we cant dynamically change whitelist/blacklist even though we calaim to support it!
     {
         RtnInfo &rc = routines[adr];
 
@@ -322,6 +328,8 @@ bool execute_string_cmd(const std::string& cmd, std::string* result)
     {
         result->append("help          -- print this help.\n");
         result->append("kill          -- kill program (not available with -appdebug).\n");
+        result->append("freeze        -- freeze the target program (all threads).\n");
+        result->append("unfreeze      -- unfreeze the target program.\n");
         result->append("clear         -- clear all collected data.\n");
         result->append("show          -- show stats on collected data.\n");
         result->append("dump <file>   -- dump current data to file.\n");
@@ -368,7 +376,7 @@ bool execute_string_cmd(const std::string& cmd, std::string* result)
     }
     else if(cmd == "clear")
     {
-        ClearData();
+        ClearData(); //todo broke because we pass pointers to contained data to instrumentation...
         *result = PrintData(20);
         return true;
     }
