@@ -38,6 +38,8 @@ Continue removing noise until candidates for the code of interest are reduced su
     help          -- print this help.
     kill          -- kill program (not available with -appdebug).
     clear         -- clear all collected data.
+    freeze        -- freeze target program (all threads).
+    unfreeze      -- unfreeze target program.
     show          -- show stats on collected data.
     dump <file>   -- dump current data to file.
     mode collect  -- collect all functions called from now on.
@@ -66,10 +68,7 @@ FindSpot has three modes:
 
 * off (default)
 
-    This mode doesnt touch the internal list at all.
-
-
-
+   This mode doesnt touch the internal list at all.
 
 
 
@@ -110,14 +109,12 @@ Our task: How can we find which function is executed when we enter `5`, without 
         using port 8022
         hello from findspot 1.0
         target frozen, type unfreeze to continue execution
-
     Note: 8022 is the hardcoded default port. This can be changed using `-p <port>`.
 
 6. The target program has been frozen close to the entry point. Switch mode now or continue execution with `unfreeze`.
 
         findspot>unfreeze
         target resumed
-
     Hint: Type `help` to see all available commands.
 
 7. We can play around with the application a bit at this point. Once we get a feel for everything,  it's time to start the actual work. In the findspot controller, type `mode collect` to switch into collection mode (see modes). Freezing the application is not necessary.
@@ -154,8 +151,6 @@ Our task: How can we find which function is executed when we enter `5`, without 
 
 
 
-
-
 ## Advanced Example
 
 We will now demonstrate a more complex example: Finding the function executed when the "bold" ToolBox button is pressed in Libre Office.
@@ -169,6 +164,9 @@ We will now demonstrate a more complex example: Finding the function executed wh
 PIN considers a function/routine only if it is a named location.
 Hence FindSpot is only useful with full smybols right now, especially on Windows.
 A mechanism to define custom functions (which can be exported from olly/ida) exists and will be part of a future release...
+
+
+The commands kill, clear and dynamic changing of whitelist/blacklist are currently broken.
 
 
 ## Usage via debugger (Linux only)
@@ -296,7 +294,7 @@ Note: Building can be a bit of a hassle on Windows. Make sure FindSpot is locate
 
 * clear command is broken
 * kill command broken
-* improve module whitelist/blacklist - buggy to dynamic changs
+* dynamic changes to whitelist/blacklist broken
 * import user functions
 * attach/detach
 * thread whitelist/blacklist
