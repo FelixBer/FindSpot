@@ -161,12 +161,14 @@ We will now demonstrate a more complex example: Finding the function executed wh
 
 ## Limitations
 
-PIN considers a function/routine only if it is a named location.
+* PIN considers a function/routine only if it is a named location.
 Hence FindSpot is only useful with full smybols right now, especially on Windows.
 A mechanism to define custom functions (which can be exported from olly/ida) exists and will be part of a future release...
 
 
-The commands kill, clear and dynamic changing of whitelist/blacklist are currently broken.
+* The commands kill, clear and dynamic changing of whitelist/blacklist are currently broken.
+
+* Only x64 supported.
 
 
 ## Usage via debugger (Linux only)
@@ -285,8 +287,9 @@ Note: -appdebug is only available on Linux.
 5. Now build the controller and optionally the example, cd to `%PINDIR%/source/tools/FindSpot/findspot-cli` and run `make` (Linux) or build the findspot-cli.vcxproj (Windows).
 
 
-Note: Building can be a bit of a hassle on Windows. Make sure FindSpot is located in /source/tools/ and try `build->clean + build->rebuild` in Visual Studio. Building has been tested with Visual Studio 2019 only. Alternatively use the binary release.
+**Note**: Building can be a bit of a hassle on Windows. Make sure FindSpot is located in /source/tools/ and try `build->clean + build->rebuild` in Visual Studio. Building has been tested with Visual Studio 2019 only. Alternatively use the binary release.
 
+**Note**: Make sure to build for x64 + release. 32bit is not supported right now.
 
 
 
@@ -295,6 +298,7 @@ Note: Building can be a bit of a hassle on Windows. Make sure FindSpot is locate
 * clear command is broken
 * kill command broken
 * dynamic changes to whitelist/blacklist broken
+* x86 broken
 * import user functions
 * attach/detach
 * thread whitelist/blacklist
